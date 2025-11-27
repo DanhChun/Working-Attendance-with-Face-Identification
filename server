@@ -1,0 +1,113 @@
+from flask import Flask, request, jsonify
+import cv2, numpy as np, threading, time, traceback
+from inference5 import identify
+from upload_sheet2 import handle_result
+
+app = Flask(__name__)
+
+MAX_ACTIVE_TASKS = 5
+active_tasks = 0
+lock = threading.Lock()
+
+IP_MAP = {
+    "your_ip: "your_camera_location",
+    "...": "..."
+}
+
+def background_send_to_sheet(mapped_name, status, location, mode):
+    """Luồng chạy ngầm để gửi Apps Script"""
+    start = time.time()
+    try:
+        handle_result(mapped_name, status, location, mode)
+        print(f"[{mode}] BG → Apps Script done in {time.time() - start:.2f}s")
+    except Exception as e:
+        print(f"[{mode}] BG error sending to Apps Script: {e}")
+
+@app.route('/api/infer_main', methods=['POST'])
+def infer_main():
+    return handle_request("main")
+
+@app.route('/api/infer_extra', methods=['POST'])
+def infer_extra():
+    return handle_request("extra")
+
+def handle_request(mode):
+    global active_tasks
+    ai_start = time.time()
+
+    try:
+        # Giới hạn số task
+        with lock:
+            if active_tasks >= MAX_ACTIVE_TASKS:
+                print(f"[{mode}] Reject: Server busy")
+                return jsonify({"status": "busy"}), 503
+            active_tasks += 1
+            print(f"[{mode}] Accept task. Active: {active_tasks}")
+
+        # Lấy file ảnh
+        if 'image' not in request.files:
+            raise ValueError("Missing file 'image'")
+        file = request.files['image']
+        filename = file.filename
+
+        # Decode ảnh
+        img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Invalid image")
+
+        # Map vị trí theo IP
+        client_ip = request.remote_addr
+        location = IP_MAP.get(client_ip, "UNKNOWN")
+        print(f" Tablet: {client_ip} → {location}")
+
+        print(f"[{mode}] Start AI: {filename}")
+        result = identify(img, filename)
+
+        ai_end = time.time()
+        print(f"[{mode}] AI done in {ai_end - ai_start:.2f}s")
+
+        # Mapping name
+        try:
+            from upload_sheet2 import NAME_MAP
+            predicted = result.get("predicted_label")
+            result["mapped_name"] = NAME_MAP.get(predicted, predicted) if predicted else "Unknown"
+        except:
+            result["mapped_name"] = "Unknown"
+
+        # -------------------------------
+        # 1) TRẢ KẾT QUẢ CHO WEB UI NGAY
+        # -------------------------------
+        ui_payload = {
+            "mode": mode,
+            "status": "success",
+            "filename": filename,
+            "processing_time": round(ai_end - ai_start, 2),
+            "data": result,
+            "location": location,
+        }
+
+        print(f"[{mode}] Returning to UI in {time.time() - ai_start:.2f}s BEFORE sending to Apps Script")
+
+        # -------------------------------
+        # 2) GỬI APPS SCRIPT Ở BACKGROUND
+        # -------------------------------
+        threading.Thread(
+            target=background_send_to_sheet,
+            args=(result["mapped_name"], result.get("status", ""), location, mode),
+            daemon=True
+        ).start()
+
+        # Trả kết quả cho UI
+        return jsonify(ui_payload), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        with lock:
+            active_tasks -= 1
+        print(f"[{mode}] Release task. Active: {active_tasks}")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000, debug=False)
