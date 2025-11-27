@@ -33,7 +33,7 @@ To run any prefered version of the project below on the local machine requires t
      <th>4</td>
      <td>opencv-python (cv2 - supported by libgl1 and libglib2.0-0)</td>
      <td>4.12.0</td>
-     <td>4.9.0.80</td>
+     <td>4.10.0</td>
     </tr>
     <tr>
      <th>5</td>
