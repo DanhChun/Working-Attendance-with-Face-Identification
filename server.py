@@ -10,8 +10,8 @@ active_tasks = 0
 lock = threading.Lock()
 
 IP_MAP = {
-    "100.86.227.8": "D6-41",
-    "100.126.127.6": "D6-06"
+    "<your_ip_here_printed_in_server_log>": "<you_location_here>"
+
 }
 
 def background_send_to_sheet(mapped_name, status, location, mode):

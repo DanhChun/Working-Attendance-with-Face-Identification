@@ -6,15 +6,15 @@ import numpy as np
 
 # Map nhãn danh sách → họ tên nhân viên
 NAME_MAP = {
-    "anh_Danh": "Chu Cao Danh",
+    "Danh": "Chu Cao Danh",
 }
 PERSON_TO_FILE = {
     "anh_Danh": {
-        "file_id": "1348RG_UwjiaeR-cx6fcuz2Xm3acM8i7A4EDfRizU0Hs",
+        "file_id": "sheet_id",
         "file_name": "DanhCC",
         "position": "",
         "department": "",
-        "apps_script_url": "https://script.google.com/macros/s/AKfycbywPuqPO68Twhv-rpp8Gv4J4XxKOQEnZdnRC44SyL70Lxh5GydxHJMwbX-wTsOnQ6xJ/exec"
+        "apps_script_url": "your_apps_script_webapp_url"
     }
 }
 
